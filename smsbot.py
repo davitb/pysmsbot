@@ -26,7 +26,7 @@ class SSHTunnelClient:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((host, port))
         self.sock.setblocking(0)
-        self.sock.settimeout(1.0)            
+        self.sock.settimeout(0.2)            
 
 
     def send(self, msg):
@@ -34,7 +34,7 @@ class SSHTunnelClient:
         print "Sent bytes: {}".format(num_bytes)
         return num_bytes
 
-    def readIntoBuffer(self):
+    def read(self):
         alldata = ""
         bytes_recd = 0
         MSGLEN = 10 * 4096
@@ -45,17 +45,14 @@ class SSHTunnelClient:
             except Exception as e:
                 break
 
-            bytes_recd = bytes_recd + len(data)
+            bytes_recd += len(data)
             print "{}".format(bytes_recd)
-            if not data or bytes_recd == 0: break
+            if not data or bytes_recd == 0: 
+                raise Exception("Socket closed")
 
             alldata += data
 
-            # if (bytes_recd == IGNORE_LEN):
-            #     bytes_recd = 0
-            #     alldata = ""
-            #     continue
-
+            # This is a workaround
             print "Step: {}".format(self.step)
             if (self.step <= 1):
                 break
@@ -65,9 +62,6 @@ class SSHTunnelClient:
 
         print "Received bytes: {}".format(bytes_recd)        
         return alldata
-
-    def read(self):
-        return self.readIntoBuffer()
 
     def close(self):
         if (self.sock != None):
@@ -88,12 +82,15 @@ class SSHSMSHandler:
         auth_token  = "8e99471f0a134d830f8d28442da25829"
         self.client = TwilioRestClient(account_sid, auth_token)
         self.finalReceivedData = ""
+        self.sentSmsCounter = 0
+        self.receivedSmsCounter = 0
 
     def sendSMS(self, to, msg, from_):
         try:
              
+            self.sentSmsCounter += 1
             self.client.messages.create(body=msg, to=to, from_=from_)
-            #print "To be sent: " + msg
+            # print "To be sent over SMS: " + msg
 
         except twilio.TwilioRestException as e:
             print e
@@ -107,6 +104,9 @@ class SSHSMSHandler:
         self.receivingThread.start()
 
     def close(self):
+        print "Total number of sent SMS: {}".format(self.sentSmsCounter)
+        
+        self.sentSmsCounter = 0
         if (self.tunnel.close() == True):
             self.stopThread = True
             self.receivingThread.join()
@@ -116,14 +116,15 @@ class SSHSMSHandler:
     def sendSmsInChunks(self, msg):
 
         parser = SmsProtocolParser()
-        n = 100 # 160/2 - 2 - 1, 1 byte redundant
+        msg = base64.urlsafe_b64encode(msg)
+        n = 155 # 160 - 5, 1 byte redundant
         chunks = [msg[i:i + n] for i in range(0, len(msg), n)]
 
         for i, val in enumerate(chunks):
             chunk = parser.encodeChunk(val, len(chunks), i)
             print chunk
             self.sendSMS("4084390019", chunk, "16506238842") 
-            time.sleep(0.2)
+            time.sleep(0.4)
 
     def receivingWorker(self):
 
@@ -131,12 +132,13 @@ class SSHSMSHandler:
             try:
                 read_bytes = self.tunnel.read()
             except Exception as e:
+                # Socket closed
+                print "Socket closed"
                 break
 
             if (len(read_bytes) == 0):
                 continue
 
-            #print binascii.hexlify(bytearray(read_bytes))
             self.sendSmsInChunks(read_bytes)
 
         print "Receiver stopped"
@@ -173,15 +175,17 @@ class SmsProtocolParser:
         self.numOfReceivedChunks = 0
 
     def encodeChunk(self, val, all, index):
-        return "r" + format(all, '02x') + format(index, '02x') + binascii.hexlify(bytearray(val))
+        return "r" + format(all, '02x') + format(index, '02x') + val
 
 sshSms = SSHSMSHandler()
 parser = SmsProtocolParser()
+receivedSmsCounter = 0
 
 @app.route('/ssh', methods=['GET', 'POST'])
 def ssh():
     global sshSms
     global parser
+    global receivedSmsCounter
 
     try:
         # print "From " + request.values.get('From', None)
@@ -189,6 +193,7 @@ def ssh():
         # print "Body " + request.values.get('Body', None)
         # print "---------------\n"
 
+        receivedSmsCounter += 1
         message = request.values.get('Body', None).encode("utf-8")
         print message
         if (not parser.setNextChunk(message)):
@@ -203,10 +208,13 @@ def ssh():
             sshSms.connect()
             # sshSms.getTunnel().send("SSH-2.0-TrileadSSH2Java_213\r\n") 
         elif (opCode == 'l'): # close
+            print "Total number of received SMS: {}".format(receivedSmsCounter)
+            receivedSmsCounter = 0
             sshSms.close()
         elif (opCode == 's'): # send
             sshSms.getTunnel().incrStep()
-            message = message.decode("hex")
+            # message = message.decode("hex")
+            message = base64.urlsafe_b64decode(message)
             sshSms.getTunnel().send(message) 
 
         return "success"
