@@ -10,6 +10,17 @@ import base64
 import binascii
 import threading
 import time
+import os
+
+receivedSmsCounter = 0
+twilio_num = "16692227897"
+davit_num = "14084390019"
+account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
+auth_token  = os.environ.get('TWILIO_AUTH_TOKEN')
+
+if (account_sid == None or auth_token == None):
+    print "Twilio account not setup"
+    sys.exit()
 
 app = Flask(__name__)
 
@@ -78,8 +89,6 @@ class SSHSMSHandler:
         self.counter = 0
         self.stopThread = False
         self.receivingThread = threading.Thread(target=self.receivingWorker)
-        account_sid = "AC4bea4553db1bfc1fa56731a958954e6c"
-        auth_token  = "8e99471f0a134d830f8d28442da25829"
         self.client = TwilioRestClient(account_sid, auth_token)
         self.finalReceivedData = ""
         self.sentSmsCounter = 0
@@ -123,7 +132,7 @@ class SSHSMSHandler:
         for i, val in enumerate(chunks):
             chunk = parser.encodeChunk(val, len(chunks), i)
             print chunk
-            self.sendSMS("4084390019", chunk, "16506238842") 
+            #self.sendSMS(davit_num, chunk, twilio_num) 
             time.sleep(0.4)
 
     def receivingWorker(self):
@@ -179,7 +188,6 @@ class SmsProtocolParser:
 
 sshSms = SSHSMSHandler()
 parser = SmsProtocolParser()
-receivedSmsCounter = 0
 
 @app.route('/ssh', methods=['GET', 'POST'])
 def ssh():
@@ -206,7 +214,7 @@ def ssh():
         
         if (opCode == 'n'): # connect
             sshSms.connect()
-            # sshSms.getTunnel().send("SSH-2.0-TrileadSSH2Java_213\r\n") 
+            #sshSms.getTunnel().send("SSH-2.0-TrileadSSH2Java_213\r\n") 
         elif (opCode == 'l'): # close
             print "Total number of received SMS: {}".format(receivedSmsCounter)
             receivedSmsCounter = 0
