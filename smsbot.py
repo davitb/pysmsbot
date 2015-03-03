@@ -76,7 +76,7 @@ class SSHTunnelClient:
 
     def close(self):
         if (self.sock != None):
-            self.sock.shutdown(socket.SHUT_RDWR)
+            #self.sock.shutdown(socket.SHUT_RDWR)
             self.sock.close()
             self.sock = None
             return True
@@ -132,8 +132,8 @@ class SSHSMSHandler:
         for i, val in enumerate(chunks):
             chunk = parser.encodeChunk(val, len(chunks), i)
             print chunk
-            #self.sendSMS(davit_num, chunk, twilio_num) 
-            time.sleep(0.4)
+            self.sendSMS(davit_num, chunk, twilio_num) 
+            time.sleep(0.1)
 
     def receivingWorker(self):
 
