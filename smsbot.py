@@ -42,7 +42,7 @@ class SSHTunnelClient:
 
     def send(self, msg):
         num_bytes = self.sock.send(msg)
-        print "Sent bytes: {}".format(num_bytes)
+        print "Sent bytes: ", num_bytes
         return num_bytes
 
     def read(self):
@@ -57,21 +57,21 @@ class SSHTunnelClient:
                 break
 
             bytes_recd += len(data)
-            print "{}".format(bytes_recd)
+            print bytes_recd
             if not data or bytes_recd == 0: 
                 raise Exception("Socket closed")
 
             alldata += data
 
             # This is a workaround
-            print "Step: {}".format(self.step)
+            print "Step: ", self.step
             if (self.step <= 1):
                 break
 
             if (bytes_recd < MSGLEN):
                 continue
 
-        print "Received bytes: {}".format(bytes_recd)        
+        print "Received bytes: ", bytes_recd
         return alldata
 
     def close(self):
@@ -92,7 +92,6 @@ class SSHSMSHandler:
         self.client = TwilioRestClient(account_sid, auth_token)
         self.finalReceivedData = ""
         self.sentSmsCounter = 0
-        self.receivedSmsCounter = 0
 
     def sendSMS(self, to, msg, from_):
         try:
@@ -113,8 +112,7 @@ class SSHSMSHandler:
         self.receivingThread.start()
 
     def close(self):
-        print "Total number of sent SMS: {}".format(self.sentSmsCounter)
-        
+        print "Total number of sent SMS: ", self.sentSmsCounter
         self.sentSmsCounter = 0
         if (self.tunnel.close() == True):
             self.stopThread = True
@@ -216,7 +214,7 @@ def ssh():
             sshSms.connect()
             #sshSms.getTunnel().send("SSH-2.0-TrileadSSH2Java_213\r\n") 
         elif (opCode == 'l'): # close
-            print "Total number of received SMS: {}".format(receivedSmsCounter)
+            print "Total number of received SMS: ", receivedSmsCounter
             receivedSmsCounter = 0
             sshSms.close()
         elif (opCode == 's'): # send
