@@ -13,7 +13,8 @@ import time
 import os
 
 receivedSmsCounter = 0
-twilio_num = "16692227897"
+#twilio_num = "16692227897"
+twilio_num = "14083594145"
 davit_num = "14084390019"
 account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
 auth_token  = os.environ.get('TWILIO_AUTH_TOKEN')
