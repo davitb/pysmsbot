@@ -11,10 +11,15 @@ import binascii
 import threading
 import time
 import os
+import random
 
 receivedSmsCounter = 0
 #twilio_num = "16692227897"
-twilio_num = "14083594145"
+twilio_nums = ["14083594145", 
+               "14086693027", 
+               "14086693024",
+               "14083594050"]
+
 davit_num = "14084390019"
 account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
 auth_token  = os.environ.get('TWILIO_AUTH_TOKEN')
@@ -38,7 +43,7 @@ class SSHTunnelClient:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((host, port))
         self.sock.setblocking(0)
-        self.sock.settimeout(0.2)            
+        self.sock.settimeout(0.7)            
 
 
     def send(self, msg):
@@ -93,6 +98,7 @@ class SSHSMSHandler:
         self.client = TwilioRestClient(account_sid, auth_token)
         self.finalReceivedData = ""
         self.sentSmsCounter = 0
+        self.nextNumber = 0
 
     def sendSMS(self, to, msg, from_):
         try:
@@ -107,9 +113,9 @@ class SSHSMSHandler:
     def getTunnel(self):
         return self.tunnel
 
-    def connect(self):
+    def connect(self, hostname):
         self.close()
-        self.tunnel.connect()
+        self.tunnel.connect(host = hostname)
         self.receivingThread.start()
 
     def close(self):
@@ -131,7 +137,7 @@ class SSHSMSHandler:
         for i, val in enumerate(chunks):
             chunk = parser.encodeChunk(val, len(chunks), i)
             print chunk
-            self.sendSMS(davit_num, chunk, twilio_num) 
+            self.sendSMS(davit_num, chunk, self.getNextTwilioNumber()) 
             time.sleep(0.1)
 
     def receivingWorker(self):
@@ -151,6 +157,12 @@ class SSHSMSHandler:
 
         print "Receiver stopped"
 
+    def getNextTwilioNumber(self):
+        self.nextNumber += 1
+        if (self.nextNumber == len(twilio_nums)):
+            self.nextNumber = 0
+        print "sending from: " + twilio_nums[self.nextNumber]
+        return twilio_nums[self.nextNumber]
 
 
 class SmsProtocolParser:
@@ -212,7 +224,8 @@ def ssh():
         print "final message: " + message
         
         if (opCode == 'n'): # connect
-            sshSms.connect()
+            # message is the hostname
+            sshSms.connect(message)
             #sshSms.getTunnel().send("SSH-2.0-TrileadSSH2Java_213\r\n") 
         elif (opCode == 'l'): # close
             print "Total number of received SMS: ", receivedSmsCounter
@@ -229,7 +242,6 @@ def ssh():
         print('*** Failed: ' + str(e))
         traceback.print_exc()
 
-
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0")
 
